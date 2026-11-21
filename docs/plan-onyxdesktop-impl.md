@@ -211,7 +211,8 @@ stderr + 3; spawn → в лаунчер. `SIGTERM`/`SIGINT` → release + `DESK_
 ### Финальный гейт
 
 - [x] `make -C tests/native test` в OnyxDesktop. 2026-11-21: 237
-  checks / 0 failures.
+  checks / 0 failures; после финальной fix-волны (c4c8930) — 259 checks /
+  0 failures (новые сюиты: config +10, desk_fb 8).
 - [x] `bash OnyxOS/scripts/qemu-desk-smoke.sh`. 2026-11-21: PASS.
 - [x] Качество для C: сборка `.onx` + ONX1 (Rust-only `quality/check.sh`
   неприменим). 2026-11-21: locked-пайплайн собирает
