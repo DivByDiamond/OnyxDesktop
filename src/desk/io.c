@@ -14,6 +14,7 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <termios.h>
+#include <time.h>
 #include <unistd.h>
 /* ABI constants (SYS_mouse_read) that libonyxc does not wrap. The
  * relative path only resolves when a sibling OnyxCompiller checkout
@@ -130,12 +131,24 @@ static long io_read_file(const char *path, unsigned char *buf,
     return n;
 }
 
+/* clock_gettime(2) from libonyxc (SYS_clock_gettime): the layout of
+ * timespec is the desk_timespec layout, copied field by field so the
+ * seam never hands the caller a foreign struct. */
+static long io_clock_gettime(int clk_id, struct desk_timespec *ts) {
+    struct timespec t;
+
+    if (ts == NULL || clock_gettime((long)clk_id, &t) != 0) return -1;
+    ts->tv_sec = t.tv_sec;
+    ts->tv_nsec = t.tv_nsec;
+    return 0;
+}
+
 static const struct desk_io ONYX_IO = {
     io_open,       io_close,      io_ioctl,      io_lseek,
     io_write,      io_spawn,      io_waitpid,    io_mouse_read,
     io_tty_raw,    io_tty_restore, io_tty_poll,  io_kbd_read,
     io_catch_signals, io_delay,   io_frame_alloc, io_frame_free,
-    io_read_file,
+    io_read_file,  io_clock_gettime,
 };
 
 const struct desk_io *desk_io_default(void) { return &ONYX_IO; }

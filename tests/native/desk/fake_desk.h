@@ -164,12 +164,20 @@ static inline long fake_read_file(const char *path, unsigned char *buf,
     return -1;
 }
 
+/* No desk test drives time yet: a quiet refusal. The bar tests bring
+ * their own scripted table (bar/fake_bar.h). */
+static inline long fake_clock_gettime(int clk_id, struct desk_timespec *ts) {
+    (void)clk_id;
+    (void)ts;
+    return -1;
+}
+
 static const struct desk_io FAKE_IO = {
     fake_open,       fake_close, fake_ioctl,     fake_lseek,
     fake_write,      fake_spawn, fake_waitpid,   fake_mouse_read,
     fake_tty_raw,    fake_tty_restore, fake_tty_poll, fake_kbd_read,
     fake_catch_signals, fake_delay, fake_frame_alloc, fake_frame_free,
-    fake_read_file,
+    fake_read_file,  fake_clock_gettime,
 };
 
 static inline void fake_sink(const char *marker) {

@@ -45,6 +45,17 @@ struct desk_pointer {
     unsigned short reserved;
 };
 
+/* Clock reading behind the clock_gettime seam: the same two longs as
+ * the OnyxOS/glibc struct timespec, spelled here so desk.h needs no
+ * libc header. clk_id is one of the DESK_CLOCK_* values below. */
+struct desk_timespec {
+    long tv_sec;
+    long tv_nsec;
+};
+
+#define DESK_CLOCK_REALTIME 0   /* libonyxc io/time.h, SYS_clock_gettime */
+#define DESK_CLOCK_MONOTONIC 1
+
 struct desk_io {
     /* A complete contract: every entry must be filled by the provider
      * (the target table in io.c and every test fake alike); the loop
@@ -73,6 +84,10 @@ struct desk_io {
      * be opened or read. Callers that must reject oversized files
      * pass a cap with headroom and judge by the returned length. */
     long (*read_file)(const char *path, unsigned char *buf, unsigned long cap);
+    /* One clock read: 0 on success, negative on failure. bar_widgets
+     * is the only caller and treats a NULL table or seam as a quiet
+     * refusal (the widget string stays empty). */
+    long (*clock_gettime)(int clk_id, struct desk_timespec *ts);
 };
 
 void desk_set_io(const struct desk_io *io); /* NULL = target default */

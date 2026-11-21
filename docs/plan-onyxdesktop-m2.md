@@ -96,10 +96,23 @@ char photos[DESK_MAX_PHOTOS][DESK_PATH_MAX]; int photo_x[..], photo_y[..]; int n
 
 ### Task 4: бар-виджеты: часы/uptime
 
-**Files:** Create: `src/widgets/bar.{c,h}`; Modify: `src/desk/io.c` (шов
-`clock`), тесты.
-- [ ] RED: год>2020 → HH:MM:SS; иначе uptime; NULL-шов → пусто.
-- [ ] GREEN.
+**Files:** Create: `src/widgets/bar/{bar.c,bar.h}` (src/widgets уже содержит
+4 файла); Modify: `src/desk/desk.h` + `src/desk/io.c` (шов `clock_gettime`),
+`tests/native/{Makefile,.gitignore}`, фейки, тесты.
+- [x] RED: год>2020 → HH:MM:SS; иначе uptime; NULL-шов → пусто.
+  2026-11-21: tests/native/bar (test_bar.c + fake_bar.h) не собирается
+  против старого дерева: нет src/widgets/bar/bar.{c,h} и шва
+  clock_gettime в struct desk_io.
+- [x] GREEN; все старые 450 проверок целы. 2026-11-21: test_bar 34
+  checks, 0 failures, весь набор 484 checks (было 450); шов один
+  `long (*clock_gettime)(int clk_id, struct desk_timespec *ts)` последним
+  полем desk_io (цели: io.c → clock_gettime() libonyxc, <time.h>,
+  SYS_clock_gettime=64), все позиционные фейки дополнены; разделитель
+  двоеточия нет в шрифте 5x7 (фолбэк '?'), взята точка: "12.34.56",
+  "up 1.05", "up 1.01.40"; порог 1609459200 = 2021-01-01T00:00:00Z;
+  NULL-шов/отказ clock → тихая пустая строка (без stderr); имя
+  активного приложения bar не строит (ui_draw_panel уже рисует);
+  ASan/UBSan чистый; build/onyxdesk.onx ONX1 ring1.
 
 ### Task 5: консоль-виджет
 

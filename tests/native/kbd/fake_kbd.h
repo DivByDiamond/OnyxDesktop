@@ -83,7 +83,7 @@ static const struct desk_io KEY_IO = {
     fake_write,    k_spawn,        k_waitpid,     fake_mouse_read,
     k_raw,        k_restore,      k_poll,        k_read,
     fake_catch_signals, fake_delay, fake_frame_alloc, fake_frame_free,
-    fake_read_file,
+    fake_read_file, fake_clock_gettime,
 };
 
 /* fake_config zeroes the binds; put the built-in ones back. */

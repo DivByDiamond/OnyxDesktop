@@ -17,7 +17,7 @@ ROOT    := ../..
 
 .PHONY: test clean
 
-test: test_harness config/test_config config/test_binds ui/test_ui_panel ui/test_ui_launcher ui/test_ui_edges desk/test_desk desk/test_desk_events desk/test_desk_fb kbd/test_kbd bmp/test_bmp bmp/test_photo
+test: test_harness config/test_config config/test_binds ui/test_ui_panel ui/test_ui_launcher ui/test_ui_edges desk/test_desk desk/test_desk_events desk/test_desk_fb kbd/test_kbd bmp/test_bmp bmp/test_photo bar/test_bar
 	./test_harness
 	./config/test_config
 	./config/test_binds
@@ -30,6 +30,7 @@ test: test_harness config/test_config config/test_binds ui/test_ui_panel ui/test
 	./kbd/test_kbd
 	./bmp/test_bmp
 	./bmp/test_photo
+	./bar/test_bar
 
 test_harness: test_harness.c
 	$(CC) $(CFLAGS) -o $@ $<
@@ -79,5 +80,10 @@ bmp/test_bmp: bmp/test_bmp.c bmp/bmp_gen.h $(BMP_SRCS) $(UI_HDRS) $(WIDGET_HDRS)
 bmp/test_photo: bmp/test_photo.c bmp/bmp_gen.h bmp/bmp_fake.h $(PHOTO_SRCS) $(UI_HDRS) $(WIDGET_HDRS)
 	$(CC) $(CFLAGS) -I $(ROOT)/src -o $@ bmp/test_photo.c $(PHOTO_SRCS)
 
+BAR_SRCS := $(ROOT)/src/widgets/bar/bar.c
+
+bar/test_bar: bar/test_bar.c bar/fake_bar.h $(BAR_SRCS) $(ROOT)/src/widgets/bar/bar.h $(DESK_HDRS) $(UI_HDRS)
+	$(CC) $(CFLAGS) -I $(ROOT)/src -o $@ bar/test_bar.c $(BAR_SRCS) $(DESK_SRCS)
+
 clean:
-	rm -f test_harness config/test_config config/test_binds ui/test_ui_panel ui/test_ui_launcher ui/test_ui_edges desk/test_desk desk/test_desk_events desk/test_desk_fb kbd/test_kbd bmp/test_bmp bmp/test_photo
+	rm -f test_harness config/test_config config/test_binds ui/test_ui_panel ui/test_ui_launcher ui/test_ui_edges desk/test_desk desk/test_desk_events desk/test_desk_fb kbd/test_kbd bmp/test_bmp bmp/test_photo bar/test_bar

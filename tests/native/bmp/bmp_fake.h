@@ -131,12 +131,19 @@ static inline void *stub_frame_alloc(unsigned long bytes) {
 
 static inline void stub_frame_free(void *frame) { free(frame); }
 
+/* photo_draw never reads a clock: a quiet refusal. */
+static inline long stub_clock_gettime(int clk_id, struct desk_timespec *ts) {
+    (void)clk_id;
+    (void)ts;
+    return -1;
+}
+
 static const struct desk_io PHOTO_IO = {
     stub_open,       stub_close,     stub_ioctl,     stub_lseek,
     stub_write,      stub_spawn,     stub_waitpid,   stub_mouse_read,
     stub_tty_raw,    stub_tty_restore, stub_tty_poll, stub_kbd_read,
     stub_catch_signals, stub_delay,  stub_frame_alloc, stub_frame_free,
-    files_read,
+    files_read,      stub_clock_gettime,
 };
 
 #endif /* TEST_BMP_FAKE_H */

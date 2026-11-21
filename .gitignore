@@ -20,3 +20,6 @@ tests/native/bmp/test_*
 !tests/native/bmp/test_*.c
 !tests/native/bmp/bmp_gen.h
 !tests/native/bmp/bmp_fake.h
+tests/native/bar/test_*
+!tests/native/bar/test_*.c
+!tests/native/bar/fake_bar.h
