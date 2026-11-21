@@ -1,0 +1,53 @@
+name: OnyxDesktop CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  # Host tests for the portable C99 modules (config parser, drawing,
+  # desk loop with fake seams). No toolchain needed.
+  native-tests:
+    name: native tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - run: make -C tests/native test
+
+  # Full build: compile OnyxCC from source, then build onyxdesk.onx and
+  # validate the ONX1 magic. The artifact is uploaded on every push.
+  build:
+    name: build (onyxdesk.onx)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Checkout OnyxCompiller
+        uses: actions/checkout@v6
+        with:
+          repository: DivByDiamond/OnyxCompiller
+          path: OnyxCompiller
+
+      - name: Build OnyxCC from source
+        # -B: fresh checkouts give all files equal mtimes, so a plain make
+        # would consider the committed prebuilt onyxcc up to date.
+        run: make -B -C OnyxCompiller
+
+      - name: Build onyxdesk (.onx)
+        run: |
+          mkdir -p build
+          make ONYXCC="$PWD/OnyxCompiller/onyxcc" build/onyxdesk.onx
+          ls -l build/
+
+      - name: Validate ONX1 magic
+        run: |
+          head -c 4 build/onyxdesk.onx | grep -q 'ONX1'
+          echo "magic OK: ONX1 ($(stat -c%s build/onyxdesk.onx) bytes)"
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: onyxdesk.onx
+          path: build/onyxdesk.onx

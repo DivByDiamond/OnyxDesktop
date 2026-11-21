@@ -1,0 +1,15 @@
+/build/
+*.o
+*.elf
+
+# Native test binaries (drivers in tests/native/**.c stay tracked).
+tests/native/test_*
+!tests/native/test_*.c
+tests/native/config/test_*
+!tests/native/config/test_*.c
+tests/native/ui/test_*
+!tests/native/ui/test_*.c
+!tests/native/ui/test_*.h
+tests/native/desk/test_*
+!tests/native/desk/test_*.c
+!tests/native/desk/fake_desk.h
