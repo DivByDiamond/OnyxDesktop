@@ -15,8 +15,8 @@
 
 ONYXCC      ?= onyxcc
 ONYXCC_FILE := $(shell command -v "$(ONYXCC)" 2>/dev/null)
-SRCS        := $(sort $(wildcard src/*.c src/*/*.c))
-HDRS        := $(sort $(wildcard src/*.h src/*/*.h))
+SRCS        := $(sort $(wildcard src/*.c src/*/*.c src/*/*/*.c))
+HDRS        := $(sort $(wildcard src/*.h src/*/*.h src/*/*/*.h))
 
 .PHONY: all test clean
 

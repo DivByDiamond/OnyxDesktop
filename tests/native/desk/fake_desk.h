@@ -67,11 +67,7 @@ static inline int fake_open(const char *path, int flags) {
     return F.open_fail || strcmp(path, DESK_FB_DEV) != 0 ? -1 : 3;
 }
 
-static inline int fake_close(int fd) {
-    (void)fd;
-    F.closes++;
-    return 0;
-}
+static inline int fake_close(int fd) { (void)fd; F.closes++; return 0; }
 
 static inline long fake_ioctl(int fd, unsigned long request, unsigned long arg) {
     (void)fd;
@@ -94,8 +90,7 @@ static inline long fake_ioctl(int fd, unsigned long request, unsigned long arg) 
 }
 
 static inline long fake_lseek(int fd, long offset, int whence) {
-    (void)fd;
-    (void)whence;
+    (void)fd; (void)whence;
     F.lseeks++;
     return F.lseek_fail ? -1 : offset;
 }
@@ -142,6 +137,13 @@ static inline long fake_mouse_read(void *out) {
 static inline void fake_catch_signals(void) {}
 static inline void fake_delay(void) {}
 
+/* kbd seams: the desk fake stays raw-ok with no keys queued; the
+ * key-injecting table for the kbd tests lives in kbd/fake_kbd.h. */
+static inline int fake_tty_raw(void) { return 1; }
+static inline void fake_tty_restore(void) {}
+static inline int fake_tty_poll(int t) { (void)t; return 0; }
+static inline int fake_kbd_read(void) { return -1; }
+
 static inline void *fake_frame_alloc(unsigned long bytes) {
     F.allocs++;
     return F.alloc_fail ? NULL : malloc((size_t)bytes);
@@ -152,10 +154,22 @@ static inline void fake_frame_free(void *frame) {
     free(frame);
 }
 
+/* No file is registered by the desk fakes: every read answers -1.
+ * The photo tests (bmp/bmp_util.h) bring a registered-file table. */
+static inline long fake_read_file(const char *path, unsigned char *buf,
+                                  unsigned long cap) {
+    (void)path;
+    (void)buf;
+    (void)cap;
+    return -1;
+}
+
 static const struct desk_io FAKE_IO = {
     fake_open,       fake_close, fake_ioctl,     fake_lseek,
-    fake_write,       fake_spawn, fake_waitpid,   fake_mouse_read,
+    fake_write,      fake_spawn, fake_waitpid,   fake_mouse_read,
+    fake_tty_raw,    fake_tty_restore, fake_tty_poll, fake_kbd_read,
     fake_catch_signals, fake_delay, fake_frame_alloc, fake_frame_free,
+    fake_read_file,
 };
 
 static inline void fake_sink(const char *marker) {

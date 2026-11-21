@@ -50,28 +50,49 @@ char bind_key[2];   /* [0]=launcher, [1]=console: esc=27, tab=9, иначе ASCI
 char photos[DESK_MAX_PHOTOS][DESK_PATH_MAX]; int photo_x[..], photo_y[..]; int n_photos;
 ```
 `DESK_MAX_PHOTOS 4`, `DESK_PATH_MAX 64`; формат строк — в спеке.
-- [ ] RED: parse binds (валидные/невалидные/дубли), photos (лимит 4,
+- [x] RED: parse binds (валидные/невалидные/дубли), photos (лимит 4,
   путь без запятой в имени, x/y отрицательные/кривые), дефолты
-  launcher:esc console:tab.
-- [ ] GREEN; все старые 57+ проверок целы.
+  launcher:esc console:tab. 2026-11-21: новый
+  tests/native/config/test_binds.c не собирается против старого
+  struct desk_config (нет bind_key/photos/DESK_KEY_*).
+- [x] GREEN; все старые 57+ проверок целы. 2026-11-21: test_config 57
+  + test_binds 49 checks, 0 failures; парсинг bind/photo вынесен в
+  src/config/bind.{c,h} (config.c 164 строки, лимит 200);
+  build/onyxdesk.onx ONX1; ASan/UBSan чистый.
 
 ### Task 2: kbd — raw TTY и диспетчер биндов
 
-**Files:** Create: `src/desk/kbd.{c,h}`; Modify: `src/desk/desk.h` (швы:
-`tty_raw/tty_restore/kbd_poll` в desk_io), `tests/native/desk/` (+подпапка
-`tests/native/kbd/`).
-- [ ] RED: инжекция ключа launcher в сценарии desktop → открытие
-  оверлея (счётчик перерисовок); ключ не в биндах → игнор; TTY raw
-  ставится после CLAIM, снимается перед spawn.
-- [ ] GREEN; сборка .onx ONX1 ring1.
+**Files:** Create: `src/desk/kbd/{kbd.c,kbd.h}`; Modify: `src/desk/desk.{c,h}`
+(швы `tty_raw/tty_restore/tty_poll/kbd_read` в desk_io), `src/desk/io.c`
+(целевые биндинги termios/poll), тесты `tests/native/kbd/`.
+- [x] RED: инжекция ключа launcher в сценарии desktop → действие отмечено
+  (счётчик через фейк), stderr-хук залогирован; ключ не в биндах → игнор;
+  TTY raw после CLAIM, restore перед spawn, raw после wait, ноль чтений
+  между spawn и wait. 2026-11-21: tests/native/kbd/test_kbd.c не
+  собирается против старого дерева (нет src/desk/kbd/kbd.{c,h}).
+- [x] GREEN; сборка .onx ONX1 ring1. 2026-11-21: 308+45 checks, 0
+  failures (test_kbd 45); ASan/UBSan чистый; kbd в подпапке
+  src/desk/kbd (лимит 4 файла/папку), desk.c 199 строк (tty-хелперы
+  kbd_arm/kbd_yield/kbd_reclaim вынесены в kbd.c); отказ raw →
+  тихая деградация (мышиный стол, заявка stderr).
 
 ### Task 3: BMP + фото-виджет
 
 **Files:** Create: `src/widgets/bmp.{c,h}`, `src/widgets/photo.{c,h}`; Test:
 `tests/native/bmp/`.
-- [ ] RED: декодер на синтетических буферах (24/32-бита, bottom-up,
+- [x] RED: декодер на синтетических буферах (24/32-бита, bottom-up,
   кривая магия/сжатие → ошибка, клип у края кадра, guard-зона).
-- [ ] GREEN; тест-фикстура BMP (генерится в тесте, не коммитится).
+  2026-11-21: tests/native/bmp не собирается против старого дерева
+  (нет src/widgets/bmp.{c,h}, photo.{c,h}, ui_rgb/ui_put_px).
+- [x] GREEN; тест-фикстура BMP (генерится в тесте, не коммитится).
+  2026-11-21: test_bmp 65 + test_photo 32 checks, 0 failures; весь
+  набор 450 checks (было 353); ui_put_px/ui_frame_ok/ui_rgb
+  экспортированы из ui.h (put_px-дисциплина без дублирования);
+  шов read_file в desk_io (target: open/read/close, host-фейк по
+  реестру), cap фото 64 KiB + 1 байт запаса на определение
+  переполнения; ASan/UBSan чистый (поймал overread в тестовом фейке
+  read_file, исправлен); build/onyxdesk.onx ONX1, flags 0x2 (ring 1
+  по определению ядра).
 
 ### Task 4: бар-виджеты: часы/uptime
 
@@ -106,6 +127,11 @@ spawn_dup/kill/waitpid-швы), desk.c (состояние), тесты `tests/n
 (`etc/desk.conf` + `etc/desk-logo.bmp` маленький образец), smoke-прогон,
 README (EN+RU) обоих репо, снимок нового стола в OnyxOS
 `docs/img/screenshot.png`.
-- [ ] `qemu-desk-smoke.sh` PASS без правок скрипта.
+- [ ] `qemu-desk-smoke.sh` PASS без правок скрипта. (при smoke глянуть
+  память ring-1: статический фото-буфер 64 KiB в .bss,
+  src/widgets/photo.c)
 - [ ] Новый скриншот: бар + фото + лаунчер-оверлей; README обновлён.
+- [ ] OnyxOS `docs/dev/roadmap.md`: строка про OnyxDesktop M2 (бар-виджеты,
+  фото, консоль, бинды) в актуальный раздел + `OnyxKernel/todo.md` P2 при
+  необходимости.
 - [ ] Commits `feat: ...` по репо, push.

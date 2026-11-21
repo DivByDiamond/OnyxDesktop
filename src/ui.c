@@ -1,7 +1,7 @@
 /*
  * ui.c - pixel, text, panel, launcher and hit-test primitives.
  *
- * All writes go through put_px(), which clips to the packed frame and
+ * All writes go through ui_put_px(), which clips to the packed frame and
  * rejects unsupported bpp values, so no caller can draw out of bounds.
  */
 #include <stddef.h>
@@ -15,7 +15,7 @@
 
 /* Reject NULLs, empty frames, unsupported formats and geometries whose
  * byte count would not fit a 32-bit unsigned. */
-static int frame_ok(const unsigned char *frame, const struct fb_info *info) {
+int ui_frame_ok(const unsigned char *frame, const struct fb_info *info) {
     unsigned bytes;
 
     if (frame == NULL || info == NULL || info->width == 0 || info->height == 0) {
@@ -41,8 +41,15 @@ static unsigned expand(unsigned short c) {
            (unsigned)((c & 31) * 255 / 31);
 }
 
-static void put_px(unsigned char *frame, const struct fb_info *info,
-                   int x, int y, unsigned short color) {
+/* 8-bit channels to RGB565; the single place the layout is known. */
+unsigned short ui_rgb(unsigned char r, unsigned char g, unsigned char b) {
+    return (unsigned short)(((unsigned)r >> 3) << 11 |
+                            ((unsigned)g >> 2) << 5 |
+                            ((unsigned)b >> 3));
+}
+
+void ui_put_px(unsigned char *frame, const struct fb_info *info,
+               int x, int y, unsigned short color) {
     unsigned char *p;
     unsigned c;
     int bytes;
@@ -71,7 +78,7 @@ static void fill_rect(unsigned char *frame, const struct fb_info *info,
 
     for (y = y0; y < y0 + h; y++) {
         for (x = x0; x < x0 + w; x++) {
-            put_px(frame, info, x, y, color);
+            ui_put_px(frame, info, x, y, color);
         }
     }
 }
@@ -87,8 +94,8 @@ static void draw_text(unsigned char *frame, const struct fb_info *info,
         for (col = 0; col < UI_GLYPH_W; col++) {
             for (row = 0; row < UI_GLYPH_H; row++) {
                 if ((g[col] & (1u << row)) != 0) {
-                    put_px(frame, info, x + i * UI_ADVANCE + col, y + row,
-                           color);
+                    ui_put_px(frame, info, x + i * UI_ADVANCE + col, y + row,
+                              color);
                 }
             }
         }
@@ -99,13 +106,13 @@ void ui_draw_panel(unsigned char *frame, const struct fb_info *info,
                    int panel_h, const char *active_name) {
     int h, ty;
 
-    if (!frame_ok(frame, info) || panel_h <= 0) {
+    if (!ui_frame_ok(frame, info) || panel_h <= 0) {
         return;
     }
     h = (unsigned)panel_h > info->height ? (int)info->height : panel_h;
     fill_rect(frame, info, 0, 0, (int)info->width, h, UI_PANEL_BG);
     if (active_name != NULL) {
-        ty = (h - UI_GLYPH_H) / 2; /* negative rows are clipped by put_px */
+        ty = (h - UI_GLYPH_H) / 2; /* negative rows are clipped by ui_put_px */
         draw_text(frame, info, UI_PAD_X, ty, active_name, UI_PANEL_TEXT);
     }
 }
@@ -115,7 +122,7 @@ void ui_draw_launcher(unsigned char *frame, const struct fb_info *info,
     unsigned y;
     int top, n, row, rh;
 
-    if (!frame_ok(frame, info) || config == NULL) {
+    if (!ui_frame_ok(frame, info) || config == NULL) {
         return;
     }
     top = config->panel_height < 0 ? 0 : config->panel_height;

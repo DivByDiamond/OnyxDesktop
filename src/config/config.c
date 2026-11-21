@@ -8,33 +8,17 @@
  * keep working on older builds.
  */
 #include <string.h>
+#include "bind.h"
 #include "config.h"
 
 #define PANEL_KEY "panel_height"
 #define PANEL_KEY_LEN 12
 #define APP_KEY "app"
 #define APP_KEY_LEN 3
-
-static int is_space(char c) {
-    return c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == '\f' ||
-           c == '\v';
-}
-
-/* Advance past leading whitespace. */
-static const char *skip_space(const char *p) {
-    while (*p != '\0' && is_space(*p)) {
-        p++;
-    }
-    return p;
-}
-
-/* Shrink [start, end) from the right. */
-static const char *trim_end(const char *start, const char *end) {
-    while (end > start && is_space(end[-1])) {
-        end--;
-    }
-    return end;
-}
+#define BIND_KEY "bind"
+#define BIND_KEY_LEN 4
+#define PHOTO_KEY "photo"
+#define PHOTO_KEY_LEN 5
 
 /* 1..200, decimal digits only. Bails out as soon as the value exceeds
  * 200, so a long digit string cannot overflow the accumulator. */
@@ -66,7 +50,7 @@ static int add_app(struct desk_config *c, const char *v, int len) {
         return -1;
     }
     for (i = 0; i < len; i++) {
-        if (is_space(v[i])) {
+        if (cfg_is_space(v[i])) {
             return -1;
         }
     }
@@ -78,8 +62,8 @@ static int add_app(struct desk_config *c, const char *v, int len) {
 
 static int parse_line(const char *line, int len, struct desk_config *c,
                       int *apps_seen) {
-    const char *start = skip_space(line);
-    const char *end = trim_end(start, line + len);
+    const char *start = cfg_skip_space_until(line, line + len);
+    const char *end = cfg_trim_end(start, line + len);
     const char *eq;
     const char *key_end;
     const char *value;
@@ -100,11 +84,8 @@ static int parse_line(const char *line, int len, struct desk_config *c,
         return 0; /* not key=value: ignored like an unknown key */
     }
 
-    key_end = trim_end(start, eq);
-    value = eq + 1;
-    while (value < end && is_space(*value)) {
-        value++;
-    }
+    key_end = cfg_trim_end(start, eq);
+    value = cfg_skip_space_until(eq + 1, end);
     value_len = (int)(end - value);
 
     if (key_end - start == PANEL_KEY_LEN &&
@@ -127,6 +108,14 @@ static int parse_line(const char *line, int len, struct desk_config *c,
         }
         return add_app(c, value, value_len);
     }
+    if (key_end - start == BIND_KEY_LEN &&
+        memcmp(start, BIND_KEY, BIND_KEY_LEN) == 0) {
+        return cfg_parse_bind(value, value_len, c);
+    }
+    if (key_end - start == PHOTO_KEY_LEN &&
+        memcmp(start, PHOTO_KEY, PHOTO_KEY_LEN) == 0) {
+        return cfg_parse_photo(value, value_len, c);
+    }
     return 0; /* unknown key */
 }
 
@@ -136,6 +125,9 @@ void desk_config_default(struct desk_config *out) {
     }
     memset(out, 0, sizeof *out);
     out->panel_height = DESK_DEFAULT_PANEL_HEIGHT;
+    /* Default M2 keybinds: launcher on esc, console on tab. */
+    out->bind_key[DESK_BIND_LAUNCHER] = DESK_KEY_ESC;
+    out->bind_key[DESK_BIND_CONSOLE] = DESK_KEY_TAB;
     /* The built-in app list: the launcher is never empty, so a broken
      * or missing desk.conf still leaves the desktop usable. */
     strcpy(out->apps[0], "osnake");

@@ -57,10 +57,22 @@ struct desk_io {
     long (*spawn)(const char *path, char *const argv[], int ring);
     long (*waitpid)(int pid, int *status, int options);
     long (*mouse_read)(void *pointer);
+    /* The tty the desk owns while no child runs: raw right after a
+     * successful CLAIM, restored around every launch and on the way
+     * out. A tty_raw refusal only disables the binds (kbd/kbd.h). */
+    int (*tty_raw)(void);
+    void (*tty_restore)(void);
+    int (*tty_poll)(int timeout_ms); /* >0: fd 0 is readable */
+    int (*kbd_read)(void);           /* one byte, or -1 on error */
     void (*catch_signals)(void);
     void (*delay)(void);
     void *(*frame_alloc)(unsigned long bytes);
     void (*frame_free)(void *frame);
+    /* Whole-file read (photo= files): up to cap bytes into buf,
+     * returns the byte count (0..cap), or -1 when the file cannot
+     * be opened or read. Callers that must reject oversized files
+     * pass a cap with headroom and judge by the returned length. */
+    long (*read_file)(const char *path, unsigned char *buf, unsigned long cap);
 };
 
 void desk_set_io(const struct desk_io *io); /* NULL = target default */

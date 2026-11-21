@@ -10,6 +10,7 @@
 #include <string.h>
 #include <unistd.h>
 #include "desk.h"
+#include "kbd/kbd.h"
 #include "ui.h"
 
 static const struct desk_io *g_io;
@@ -63,17 +64,24 @@ static int present(const struct desk_io *io, int fd,
     return 1;
 }
 
-/* Fresh launcher frame plus one present. */
+/* Fresh launcher frame plus one present. Returns 0, or DESK_EXIT_FB
+ * when the fb write failed (the note is logged here, once, not at
+ * every caller). */
 static int repaint(const struct desk_config *c, const struct fb_info *i,
                    unsigned char *frame, const struct desk_io *io, int fd) {
+    int ok;
+
     ui_draw_panel(frame, i, c->panel_height, "onyxdesk");
     ui_draw_launcher(frame, i, c, -1);
-    return present(io, fd, frame, i);
+    ok = present(io, fd, frame, i);
+    if (!ok) fprintf(stderr, "desk: present failed\n");
+    return ok ? 0 : DESK_EXIT_FB;
 }
 
-/* Managed launch of /bin/<name>. Emits APP_STARTED/APP_RETURN only
- * for a child that really ran; a spawn error returns -1. */
-static int launch(const struct desk_io *io, const char *name) {
+/* Managed launch of /bin/<name>: the tty goes to the child for the
+ * run and back afterwards (a spawn that never started re-arms raw
+ * immediately). APP_STARTED/APP_RETURN only for a child that ran. */
+static int launch(const struct desk_io *io, const char *name, int kbd) {
     char path[DESK_NAME_MAX + 5];
     char *argv[2];
     long pid, waited;
@@ -87,9 +95,11 @@ static int launch(const struct desk_io *io, const char *name) {
     strcpy(path + 5, name);
     argv[0] = path;
     argv[1] = NULL;
+    kbd_yield(io, kbd); /* the child owns the tty while it runs */
     pid = io->spawn(path, argv, DESK_RING);
     if (pid < 0) {
         fprintf(stderr, "desk: spawn %s failed\n", name);
+        kbd_reclaim(io, kbd);
         return -1;
     }
     desk_emit("APP_STARTED %s %d", name, (int)pid);
@@ -98,6 +108,7 @@ static int launch(const struct desk_io *io, const char *name) {
     do {
         waited = io->waitpid((int)pid, &status, 0);
     } while (waited == -DESK_EINTR || waited == -DESK_ENOENT);
+    kbd_reclaim(io, kbd); /* the child returned: the tty is ours */
     if (waited < 0) status = 1;
     desk_emit("APP_RETURN %d", status);
     return 0;
@@ -111,7 +122,7 @@ int desk_run(const struct desk_config *config, const char *autostart,
     struct desk_pointer p;
     unsigned char *frame;
     unsigned long frame_bytes;
-    int fd, down = 0, rc = 0;
+    int fd, down = 0, rc = 0, kbd = 0, hit;
 
     if (config == NULL) {
         desk_config_default(&fallback);
@@ -126,25 +137,21 @@ int desk_run(const struct desk_config *config, const char *autostart,
     fd = io->open(DESK_FB_DEV, DESK_FB_FLAGS);
     if (fd < 0) {
         fprintf(stderr, "desk: cannot open %s\n", DESK_FB_DEV);
-        desk_emit("DESK_EXIT %d", DESK_EXIT_FB);
-        return DESK_EXIT_FB;
+        goto bad;
     }
     if (io->ioctl(fd, DESK_FB_GET_INFO, (unsigned long)&info) < 0 ||
         !fb_sane(&info)) {
         fprintf(stderr, "desk: unusable framebuffer info\n");
-        io->close(fd);
-        desk_emit("DESK_EXIT %d", DESK_EXIT_FB);
-        return DESK_EXIT_FB;
+        goto bad;
     }
     if (io->ioctl(fd, DESK_FB_CLAIM, 0) < 0) {
         fprintf(stderr, "desk: framebuffer claim refused\n");
-        io->close(fd); /* no RELEASE: the claim is not ours */
-        desk_emit("DESK_EXIT %d", DESK_EXIT_FB);
-        return DESK_EXIT_FB;
+        goto bad; /* no RELEASE: the claim is not ours */
     }
     /* The claim is ours: arm the signal path before anything else so a
      * SIGTERM cannot bypass the RELEASE. Every exit goes through out:. */
     io->catch_signals();
+    kbd = kbd_arm(io); /* raw for the session, or the binds stay off */
     frame_bytes = (unsigned long)info.width * info.height * (info.bpp / 8);
     frame = io->frame_alloc(frame_bytes);
     if (frame == NULL) {
@@ -153,25 +160,16 @@ int desk_run(const struct desk_config *config, const char *autostart,
         goto out;
     }
     desk_emit("DESK_READY");
-    if (!repaint(config, &info, frame, io, fd)) {
-        fprintf(stderr, "desk: present failed\n");
-        rc = DESK_EXIT_FB;
-        goto out;
-    }
+    if ((rc = repaint(config, &info, frame, io, fd)) != 0) goto out;
     if (autostart != NULL) {
-        if (launch(io, autostart) == 0 && once) goto out;
+        if (launch(io, autostart, kbd) == 0 && once) goto out;
         if (g_stop) goto out;
-        if (!repaint(config, &info, frame, io, fd)) {
-            fprintf(stderr, "desk: present failed\n");
-            rc = DESK_EXIT_FB;
-            goto out;
-        }
+        if ((rc = repaint(config, &info, frame, io, fd)) != 0) goto out;
     }
     for (;;) {
-        int hit;
-
         if (g_stop) break;
         if (io->mouse_read(&p) < 0) break;
+        if (kbd) kbd_pass(config, io);
         io->delay(); /* every table fills every entry: see desk.h */
         if (p.buttons & DESK_BTN_EXIT) break;
         if (!(p.buttons & DESK_BTN_CLICK)) {
@@ -183,18 +181,19 @@ int desk_run(const struct desk_config *config, const char *autostart,
         hit = ui_hit_test(&info, config->panel_height, config->n_apps,
                           p.x, p.y);
         if (hit < 0) continue;
-        if (launch(io, config->apps[hit]) == 0 && once) break;
+        if (launch(io, config->apps[hit], kbd) == 0 && once) break;
         if (g_stop) break;
-        if (!repaint(config, &info, frame, io, fd)) {
-            fprintf(stderr, "desk: present failed\n");
-            rc = DESK_EXIT_FB;
-            break;
-        }
+        if ((rc = repaint(config, &info, frame, io, fd)) != 0) break;
     }
 out:
     if (frame != NULL) io->frame_free(frame);
+    kbd_yield(io, kbd); /* hand the tty back on the way out */
     io->ioctl(fd, DESK_FB_RELEASE, 0); /* exactly one RELEASE per claim */
     io->close(fd);
     desk_emit("DESK_EXIT %d", rc);
     return rc;
+bad: /* fb open/info/claim failures: no claim to release */
+    if (fd >= 0) io->close(fd);
+    desk_emit("DESK_EXIT %d", DESK_EXIT_FB);
+    return DESK_EXIT_FB;
 }

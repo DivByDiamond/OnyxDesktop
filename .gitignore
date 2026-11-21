@@ -13,3 +13,10 @@ tests/native/ui/test_*
 tests/native/desk/test_*
 !tests/native/desk/test_*.c
 !tests/native/desk/fake_desk.h
+tests/native/kbd/test_*
+!tests/native/kbd/test_*.c
+!tests/native/kbd/fake_kbd.h
+tests/native/bmp/test_*
+!tests/native/bmp/test_*.c
+!tests/native/bmp/bmp_gen.h
+!tests/native/bmp/bmp_fake.h
